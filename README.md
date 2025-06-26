@@ -6,7 +6,7 @@
 
 An interactive web application for exploring single-cell RNA sequencing datasets, featuring data visualization, clustering analysis, and differential expression.
 
-![App Screenshot](https://raw.githubusercontent.com/yourusername/single-cell-explorer/main/images/app-screenshot.png)
+![App Screenshot](https://raw.githubusercontent.com/se7en69/Single-Cell-RNA-Seq-Explorer/main/images/workflow.png)
 
 ## 🚀 Features
 
