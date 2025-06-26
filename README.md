@@ -90,30 +90,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For questions or suggestions, please contact:  
 [Abdul Rehman Ikram](mailto:hanzo7n@gmail.com)  
 ```
-
-### Additional files you should include in your repo:
-
-1. `requirements.txt`:
-```
-streamlit==1.28.0
-scanpy==1.9.0
-pandas==2.0.3
-numpy==1.24.3
-plotly==5.15.0
-matplotlib==3.7.1
-louvain==0.8.1
-scipy==1.10.1
-altair==5.0.1
-```
-
-### To set up your GitHub repository:
-
-1. Create a new repository on GitHub
-2. Clone it locally
-3. Add these files
-4. Commit and push:
-```bash
-git add .
-git commit -m "Initial commit with basic single-cell explorer app"
-git push origin main
-```
