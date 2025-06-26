@@ -101,6 +101,7 @@ pandas==2.0.3
 numpy==1.24.3
 plotly==5.15.0
 matplotlib==3.7.1
+louvain==0.8.1
 scipy==1.10.1
 altair==5.0.1
 ```
