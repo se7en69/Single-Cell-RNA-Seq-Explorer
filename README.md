@@ -1,8 +1,8 @@
 # Single-Cell RNA-Seq Explorer 🧬
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-streamlit-app-url.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://single-cell-rna-seq-explorer.streamlit.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Project Status: Active Development](https://img.shields.io/badge/status-active%20development-brightgreen)](https://github.com/yourusername/single-cell-explorer)
+[![Project Status: Active Development](https://img.shields.io/badge/status-active%20development-brightgreen)](https://github.com/se7en69/Single-Cell-RNA-Seq-Explorer)
 
 An interactive web application for exploring single-cell RNA sequencing datasets, featuring data visualization, clustering analysis, and differential expression.
 
