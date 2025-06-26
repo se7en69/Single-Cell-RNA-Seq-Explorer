@@ -46,7 +46,7 @@ The app will open in your default browser at `http://localhost:8501`
 ## 🌟 Try It Online
 
 You can test the app without installation:  
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-streamlit-app-url.streamlit.app/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://single-cell-rna-seq-explorer.streamlit.app/)
 
 ## 🛠️ Project Structure
 
