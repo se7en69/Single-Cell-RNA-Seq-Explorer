@@ -82,8 +82,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📧 Contact
 
 For questions or suggestions, please contact:  
-[Your Name](mailto:your.email@example.com)  
-[Project Discussion Board](https://github.com/yourusername/single-cell-explorer/discussions)
+[Abdul Rehman Ikram](mailto:hanzo7n@gmail.com)  
 ```
 
 ### Additional files you should include in your repo:
@@ -100,27 +99,6 @@ scipy==1.10.1
 altair==5.0.1
 ```
 
-2. `.gitignore`:
-```
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environment
-venv/
-ENV/
-
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Streamlit secrets
-.secrets/
-```
-
 ### To set up your GitHub repository:
 
 1. Create a new repository on GitHub
@@ -132,12 +110,3 @@ git add .
 git commit -m "Initial commit with basic single-cell explorer app"
 git push origin main
 ```
-
-The README clearly communicates that:
-- The project is in active development
-- Contributions are welcome
-- There are multiple ways to contribute
-- It's beginner-friendly with "good first issue" labels
-- Provides clear installation and usage instructions
-
-You can further customize it with your actual contact details, screenshots, and specific contribution guidelines as the project grows.
