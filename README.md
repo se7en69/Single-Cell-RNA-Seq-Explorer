@@ -1,5 +1,3 @@
-Here's a complete `README.md` file for your GitHub repository that clearly states the project is in development and welcomes contributors:
-
 ```markdown
 # Single-Cell RNA-Seq Explorer 🧬
 
