@@ -1,4 +1,3 @@
-```markdown
 # Single-Cell RNA-Seq Explorer 🧬
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-streamlit-app-url.streamlit.app/)
@@ -16,6 +15,13 @@ An interactive web application for exploring single-cell RNA sequencing datasets
 - **Differential Expression**: Identify marker genes between clusters
 - **Data Processing**: Normalization, filtering, and scaling
 - **Multiple Input Formats**: Supports h5ad, CSV, and TSV files
+
+## 📦 Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/single-cell-explorer.git
+cd single-cell-explorer
 
 ## 📦 Installation
 
