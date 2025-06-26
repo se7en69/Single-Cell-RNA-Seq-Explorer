@@ -20,14 +20,14 @@ An interactive web application for exploring single-cell RNA sequencing datasets
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/single-cell-explorer.git
+git clone https://github.com/se7en69/Single-Cell-RNA-Seq-Explorer.git
 cd single-cell-explorer
 
 ## 📦 Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/single-cell-explorer.git
+git clone https://github.com/se7en69/Single-Cell-RNA-Seq-Explorer.git
 cd single-cell-explorer
 ```
 
