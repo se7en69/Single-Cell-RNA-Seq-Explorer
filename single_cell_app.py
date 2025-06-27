@@ -11,6 +11,7 @@ import hashlib
 from io import StringIO
 import altair as alt
 from io import BytesIO
+from PIL import Image
 
 # Set page config
 st.set_page_config(
@@ -104,29 +105,42 @@ def load_data(uploaded_file, example_dataset):
         try:
             progress_bar = st.progress(0, text="Loading example dataset...")
             
+            dataset_loaders = {
+                "pbmc3k": sc.datasets.pbmc3k,
+                "pbmc3k_processed": sc.datasets.pbmc3k_processed,
+                "pbmc68k_reduced": sc.datasets.pbmc68k_reduced,
+                "blobs": sc.datasets.blobs,
+                "krumsiek11": sc.datasets.krumsiek11,
+                "moignard15": sc.datasets.moignard15,
+                "paul15": sc.datasets.paul15,
+                "ebi_expression_atlas": sc.datasets.ebi_expression_atlas,
+                "toggleswitch": sc.datasets.toggleswitch,
+                "visium_sge": sc.datasets.visium_sge
+            }
+            
             with st.spinner(f"Loading {example_dataset} dataset..."):
-                if example_dataset == "pbmc3k":
-                    adata = sc.datasets.pbmc3k()
-                elif example_dataset == "pancreas":
-                    adata = sc.datasets.pancreas()
-                elif example_dataset == "tabula_muris":
-                    adata = sc.datasets.tabulamuris()
+                adata = dataset_loaders[example_dataset]()
+                
+                # Some datasets return raw data, others return processed
+                if isinstance(adata, str):
+                    # Handle cases where dataset returns a file path
+                    adata = sc.read(adata)
+                
+                progress_bar.progress(100, text="Example dataset loaded!")
+                time.sleep(0.5)
+                progress_bar.empty()
+                
+                st.session_state.adata = adata
+                st.session_state.file_type = "example"
+                return adata
             
-            progress_bar.progress(100, text="Example dataset loaded!")
-            time.sleep(0.5)
-            progress_bar.empty()
-            
-            st.session_state.adata = adata
-            st.session_state.file_type = "example"
-            return adata
-        
         except Exception as e:
-            st.error(f"Error loading example dataset: {str(e)}")
+            st.error(f"Error loading example dataset {example_dataset}: {str(e)}")
             return None
     
     else:
         return None
-
+    
 # Preprocessing function
 def preprocess_data(adata, normalize=True, log_transform=True, scale=True, min_genes=200, min_cells=3):
     if adata is None:
@@ -256,7 +270,7 @@ def create_interactive_plot(adata, plot_type, color_by=None, gene=None):
             coords = adata.obsm['X_umap']
             title = "UMAP Projection"
         elif plot_type == "t-SNE":
-            coords = adata.obsm['X_tsne']  # Note: 'tsne' without hyphen
+            coords = adata.obsm['X_tsne']
             title = "t-SNE Projection"
         else:  # PCA
             coords = adata.obsm['X_pca'][:, :2]
@@ -310,48 +324,58 @@ def create_interactive_plot(adata, plot_type, color_by=None, gene=None):
     except Exception as e:
         st.error(f"Error creating plot: {str(e)}")
         return None
+# dataset report functions    
+def generate_dataset_report(adata):
+    """Generate a text report of the dataset with proper attribute checking"""
+    report_lines = [
+        "Dataset Summary Report",
+        "----------------------",
+        f"Cells: {adata.n_obs}",
+        f"Genes: {adata.n_vars}",
+        f"Memory Usage: {adata.__sizeof__()/1024/1024:.2f} MB",
+        ""
+    ]
+    
+    # Check for observations
+    if hasattr(adata, 'obs') and adata.obs is not None:
+        obs_cols = list(adata.obs.columns) if not adata.obs.empty else []
+        report_lines.append(f"Observations (columns): {', '.join(obs_cols)}")
+    else:
+        report_lines.append("Observations: None")
+    
+    # Check for variables
+    if hasattr(adata, 'var') and adata.var is not None:
+        var_cols = list(adata.var.columns) if not adata.var.empty else []
+        report_lines.append(f"Variables (columns): {', '.join(var_cols)}")
+    else:
+        report_lines.append("Variables: None")
+    
+    # Check X matrix
+    if hasattr(adata, 'X') and adata.X is not None:
+        report_lines.extend([
+            "",
+            f"X matrix type: {type(adata.X)}",
+            f"X matrix shape: {adata.X.shape}"
+        ])
+    else:
+        report_lines.append("\nX matrix: None")
+    
+    # Check unstructured data
+    if hasattr(adata, 'uns') and adata.uns:
+        report_lines.append("\nUnstructured annotations:")
+        for k in adata.uns.keys():
+            report_lines.append(f"- {k}")
+    else:
+        report_lines.append("\nUnstructured annotations: None")
+    
+    return "\n".join(report_lines)
+    
 # Main app function
 def main():
-    # Sidebar navigation
-    st.sidebar.image('images/logo.png', width=300)
-    st.sidebar.title("Single-Cell Explorer 🧬")
-    st.sidebar.write("**Interactive analysis of single-cell RNA-seq data** 🔍")
-    st.sidebar.markdown("---")
-    
-    # App introduction
-    st.sidebar.header("Introduction")
-    st.sidebar.write(
-        """
-        Welcome to **Single-Cell Explorer**!
-        This app provides interactive visualization and analysis of single-cell RNA sequencing data.
-        Upload your data or explore example datasets to perform clustering, dimensionality reduction,
-        and differential expression analysis.
-        """
-    )
-    st.sidebar.markdown("---")
-    
-    # Navigation options
     app_mode = st.sidebar.radio(
-        "Navigate the App",
-        ["Data Upload", "Preprocessing", "Visualization", "Analysis", "Help"]
-    )
-    st.sidebar.markdown("---")
-    
-    # Data input section (shown for all analysis tabs)
-    if app_mode in ["Data Upload", "Preprocessing", "Visualization", "Analysis"]:
-        st.sidebar.header("Data Input")
-        uploaded_file = st.sidebar.file_uploader(
-            "Upload scRNA-seq data",
-            type=['csv', 'tsv', 'h5ad'],
-            help="Upload gene expression matrix (CSV/TSV) or AnnData object (h5ad)"
-        )
-        
-        example_dataset = st.sidebar.selectbox(
-            "Or use example dataset",
-            ["None", "pbmc3k", "pancreas", "tabula_muris"],
-            help="Select an example dataset to explore"
-        )
-    
+    "Navigate the App",
+    ["Home", "Data Upload", "Preprocessing", "Visualization", "Analysis", "Help"]
+)
     # Conditional sections based on navigation
     if app_mode == "Preprocessing":
         st.sidebar.header("Preprocessing Options")
@@ -372,34 +396,165 @@ def main():
     elif app_mode == "Analysis":
         st.sidebar.header("Analysis Parameters")
         with st.sidebar.expander("Clustering"):
-            resolution = st.slider("Resolution", 0.1, 2.0, 0.5, 0.1)
-    
-    st.sidebar.markdown("---")
-    
-    # About section
-    st.sidebar.header("About")
-    st.sidebar.write(
-        """
-        This tool is designed for researchers to explore single-cell RNA sequencing data.
-        For technical support or feature requests, please contact us.
-        """
-    )
-    st.sidebar.markdown("---")
-    st.sidebar.write("Created by [Abdul Rehman Ikram]. For feedback, contact: [hanzo7n@gmail.com](mailto:hanzo7n@gmail.com)")
-    
+            resolution = st.slider("Resolution", 0.1, 2.0, 0.5, 0.1)  
     # Main content area
-    if app_mode == "Data Upload":
+    if app_mode == "Home":
+        left_col, right_col = st.columns(2)
+
+        # Display logo - replace with your actual logo path
+        img = Image.open("images/logo.png")  
+        left_col.image(img, width=400)  
+
+        # Display the title and description on the right
+        right_col.markdown("# Single Cell Explorer")
+        right_col.markdown("### Interactive analysis and visualization of single-cell RNA sequencing data")
+        right_col.markdown("##### Created by Abdul Rehman Ikram")
+        right_col.markdown("**For Research and Educational Purposes**")
+
+        st.markdown("---")
+
+        st.markdown(
+            """
+            ### Summary
+            **Single Cell Explorer** is an interactive tool for analyzing and visualizing single-cell RNA sequencing (scRNA-seq) data. 
+            The application provides a comprehensive workflow from raw data preprocessing to advanced analysis including:
+            
+            - **Dimensionality reduction** (PCA, UMAP, t-SNE)
+            - **Cell clustering** (Leiden algorithm)
+            - **Differential expression analysis**
+            - **Interactive visualization** of gene expression patterns
+            
+            Designed for researchers at all computational levels, Single Cell Explorer makes cutting-edge single-cell analysis accessible 
+            through an intuitive interface without requiring programming expertise.
+            """
+        )
+
+        st.markdown("---")
+
+        left_col, right_col = st.columns(2)
+
+        # Display a schematic of single-cell analysis - replace with your image
+        img = Image.open("images/workflow.png")  
+        right_col.image(img, caption="Single-Cell Analysis Workflow", width=650)  
+
+        left_col.markdown(
+            """
+            ### Navigation Guide
+
+            Use the sidebar menu to access different analysis modules:
+
+            - **Data Upload**: Import your scRNA-seq data (h5ad, CSV/TSV) or select example datasets
+            - **Preprocessing**: Filter, normalize, and scale your single-cell data
+            - **Visualization**: Explore data through interactive UMAP, t-SNE, and PCA plots
+            - **Analysis**: Perform clustering and differential expression analysis
+            - **Help**: Documentation and usage instructions
+
+            The app maintains state between pages, allowing seamless exploration of your data.
+            """
+        )
+        st.markdown("---")
+
+        left_info_col, right_info_col = st.columns(2)
+
+        left_info_col.markdown(
+            """
+            ### About the Developer
+            Contact me with any questions or feedback about Single Cell Explorer.
+
+            ##### Abdul Rehman Ikram [![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/bukotsunikki.svg?style=social&label=Follow%20%40Abdul)](https://x.com/abdul_se7en)
+
+            - Email: <hanzo7n@gmail.com>
+            - GitHub: https://github.com/se7en69
+            - LinkedIn: https://www.linkedin.com/in/hanzo7/
+            - Portfolio: https://abdulrehmanikramportfolio.netlify.app/
+            """
+        )
+
+        right_info_col.markdown(
+            """
+            ### Technical Details
+            
+            **Built with:**
+            - Python 3
+            - Scanpy for single-cell analysis
+            - Streamlit for interactive web interface
+            - Plotly for interactive visualizations
+            
+            **License:**  
+            MIT License
+            """
+        )
+
+        st.markdown("---")
+        st.markdown("""
+        <style>
+        .small-font {
+            font-size:12px !important;
+            color: #666;
+        }
+        </style>
+        <p class="small-font">Note: This application is for research use only. Not for clinical or diagnostic purposes.</p>
+        """, unsafe_allow_html=True)
+    
+    elif app_mode == "Data Upload":
         st.header("Data Upload")
-        st.write("Upload your single-cell RNA-seq data to begin analysis.")
+        st.write("Upload your single-cell RNA-seq data to begin analysis or select an example dataset.")
         
-        adata = load_data_cached(uploaded_file, example_dataset)
+        upload_col, example_col = st.columns([1, 1])
         
+        with upload_col:
+            st.subheader("Upload Your Data")
+            uploaded_file = st.file_uploader(
+                "Choose scRNA-seq data file",
+                type=['csv', 'tsv', 'h5ad'],
+                help="Upload gene expression matrix (CSV/TSV) or AnnData object (h5ad)",
+                key="main_uploader"
+            )
+            
+            if uploaded_file is not None:
+                st.success(f"File uploaded: {uploaded_file.name}")
+                st.caption(f"File size: {uploaded_file.size/1024/1024:.2f} MB")
+
+        with example_col:
+            st.subheader("Example Datasets")
+            DATASET_OPTIONS = {
+                "None": "Select your own data",
+                "pbmc3k": "3k PBMCs from 10x Genomics",
+                "pbmc3k_processed": "Preprocessed PBMC3k dataset",
+                "pbmc68k_reduced": "68k PBMCs (reduced for demo)",
+                "blobs": "Synthetic blob dataset for testing",
+                "krumsiek11": "Synthetic myeloid progenitor dataset",
+                "moignard15": "Mouse embryonic stem cells",
+                "paul15": "Mouse myeloid progenitors",
+                "ebi_expression_atlas": "EBI Expression Atlas dataset",
+                "toggleswitch": "Synthetic toggle switch data",
+                "visium_sge": "Visium spatial gene expression data"
+            }
+            
+            example_dataset = st.selectbox(
+                "Select example dataset",
+                options=list(DATASET_OPTIONS.keys()),
+                format_func=lambda x: f"{x} - {DATASET_OPTIONS[x]}" if x != "None" else x,
+                help="Select an example dataset to explore",
+                key="main_example_selector"
+            )
+        
+        if st.button("Load Data", type="primary", help="Click to load the selected data"):
+            with st.spinner("Loading data..."):
+                try:
+                    adata = load_data_cached(uploaded_file, example_dataset)
+                    st.session_state.adata = adata
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error loading data: {str(e)}")
+
         if st.session_state.adata is not None:
             adata = st.session_state.adata
             
             with st.expander("Dataset Information", expanded=True):
-                col1, col2, col3 = st.columns(3)
+                st.success("Data successfully loaded!")
                 
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Number of cells", adata.n_obs)
                 with col2:
@@ -407,13 +562,50 @@ def main():
                 with col3:
                     st.metric("Size in memory", f"{adata.__sizeof__()/1e6:.2f} MB")
                 
-                if adata.obs.shape[1] > 0:
-                    st.subheader("Cell Metadata Preview")
-                    st.dataframe(adata.obs.head())
-        
-        else:
-            st.warning("Please upload data or select an example dataset to begin analysis")
-    
+                # Safe tab implementation
+                tab_names = []
+                if hasattr(adata, 'obs') and not adata.obs.empty:
+                    tab_names.append("Cell Metadata")
+                if hasattr(adata, 'X') and adata.X is not None:
+                    tab_names.append("Gene Expression")
+                
+                if tab_names:
+                    tabs = st.tabs(tab_names)
+                    
+                    if "Cell Metadata" in tab_names:
+                        with tabs[tab_names.index("Cell Metadata")]:
+                            st.dataframe(adata.obs.head())
+                    
+                    if "Gene Expression" in tab_names:
+                        with tabs[tab_names.index("Gene Expression")]:
+                            try:
+                                # Handle both sparse and dense matrices
+                                if hasattr(adata.X, 'toarray'):
+                                    preview_df = pd.DataFrame(adata.X[:5,:5].toarray(), 
+                                                        index=adata.obs.index[:5], 
+                                                        columns=adata.var.index[:5])
+                                else:
+                                    preview_df = pd.DataFrame(adata.X[:5,:5], 
+                                                        index=adata.obs.index[:5], 
+                                                        columns=adata.var.index[:5])
+                                st.dataframe(preview_df)
+                            except Exception as e:
+                                st.warning(f"Could not display gene expression: {str(e)}")
+                else:
+                    st.info("No metadata or expression data available for preview")
+                
+                # Safe download button
+                try:
+                    report = generate_dataset_report(adata)
+                    st.download_button(
+                        label="Download Dataset Summary",
+                        data=report,
+                        file_name="dataset_summary.txt",
+                        mime="text/plain"
+                    )
+                except Exception as e:
+                    st.warning(f"Could not generate dataset report: {str(e)}")
+                                
     elif app_mode == "Preprocessing":
         st.header("Data Preprocessing")
         
