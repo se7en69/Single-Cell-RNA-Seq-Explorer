@@ -490,177 +490,177 @@ def main():
                 fig = create_interactive_plot(st.session_state.adata, plot_type, color_by, gene)
                 st.plotly_chart(fig, use_container_width=True)
     
-        elif app_mode == "Analysis":
-            st.header("Data Analysis")
-    
-    if st.session_state.adata is None:
-        st.warning("Please upload and preprocess data first")
-        return
-    
-    if not st.session_state.processed:
-        st.warning("Please preprocess your data first in the Preprocessing section")
-        return
-    
-    if st.button("Run Clustering", help="Perform cell clustering using Leiden algorithm"):
-        with st.spinner("Running Leiden clustering..."):
-            adata = run_clustering_cached(
-                st.session_state.adata,
-                resolution=resolution
-            )
-            st.session_state.clustered = True
-            st.session_state.adata = adata
-            st.success("Clustering completed!")
-    
-    if st.session_state.clustered:
-        cluster_key = 'leiden'
+    elif app_mode == "Analysis":
+        st.header("Data Analysis")
         
-        st.subheader("Cluster Analysis")
-        cluster_counts = st.session_state.adata.obs[cluster_key].value_counts().sort_index()
+        if st.session_state.adata is None:
+            st.warning("Please upload and preprocess data first")
+            return
         
-        col1, col2 = st.columns([1, 2])
+        if not st.session_state.processed:
+            st.warning("Please preprocess your data first in the Preprocessing section")
+            return
         
-        with col1:
-            st.altair_chart(alt.Chart(pd.DataFrame({
-                'Cluster': cluster_counts.index.astype(str),
-                'Count': cluster_counts.values
-            })).mark_bar().encode(
-                x='Cluster:N',
-                y='Count:Q',
-                color='Cluster:N'
-            ), use_container_width=True)
+        if st.button("Run Clustering", help="Perform cell clustering using Leiden algorithm"):
+            with st.spinner("Running Leiden clustering..."):
+                adata = run_clustering_cached(
+                    st.session_state.adata,
+                    resolution=resolution
+                )
+                st.session_state.clustered = True
+                st.session_state.adata = adata
+                st.success("Clustering completed!")
+        
+        if st.session_state.clustered:
+            cluster_key = 'leiden'
             
-            st.download_button(
-                label="📥 Download Cluster Data",
-                data=cluster_counts.to_csv(),
-                file_name="cluster_counts.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            cluster_fig = create_interactive_plot(st.session_state.adata, "UMAP", cluster_key)
-            st.plotly_chart(cluster_fig, use_container_width=True)
-        
-        st.subheader("Differential Expression Analysis")
-
-        # Form for input parameters only
-        with st.form("diff_exp_form"):
-            col1, col2 = st.columns(2)
+            st.subheader("Cluster Analysis")
+            cluster_counts = st.session_state.adata.obs[cluster_key].value_counts().sort_index()
+            
+            col1, col2 = st.columns([1, 2])
             
             with col1:
-                cluster1 = st.selectbox(
-                    "Select cluster",
-                    sorted(st.session_state.adata.obs[cluster_key].unique()),
-                    key="cluster1_select"
+                st.altair_chart(alt.Chart(pd.DataFrame({
+                    'Cluster': cluster_counts.index.astype(str),
+                    'Count': cluster_counts.values
+                })).mark_bar().encode(
+                    x='Cluster:N',
+                    y='Count:Q',
+                    color='Cluster:N'
+                ), use_container_width=True)
+                
+                st.download_button(
+                    label="📥 Download Cluster Data",
+                    data=cluster_counts.to_csv(),
+                    file_name="cluster_counts.csv",
+                    mime="text/csv"
                 )
             
             with col2:
-                compare_option = st.radio(
-                    "Comparison type",
-                    ["vs all other cells", "vs specific cluster"],
-                    key="compare_option"
-                )
-                
-                if compare_option == "vs specific cluster":
-                    cluster2 = st.selectbox(
-                        "Select comparison cluster",
-                        sorted(st.session_state.adata.obs[cluster_key].unique()),
-                        key="cluster2_select"
-                    )
-                else:
-                    cluster2 = None
+                cluster_fig = create_interactive_plot(st.session_state.adata, "UMAP", cluster_key)
+                st.plotly_chart(cluster_fig, use_container_width=True)
             
-            submitted = st.form_submit_button("Run Differential Expression")
+            st.subheader("Differential Expression Analysis")
 
-        # Results display and downloads (outside the form)
-        if submitted:
-            with st.spinner("Running differential expression analysis..."):
-                adata = run_diff_exp_cached(st.session_state.adata, cluster1, cluster2)
-                st.session_state.adata = adata
-                st.success("Analysis completed!")
+            # Form for input parameters only
+            with st.form("diff_exp_form"):
+                col1, col2 = st.columns(2)
                 
-                tab1, tab2, tab3 = st.tabs(["Results Table", "Volcano Plot", "Heatmap"])
+                with col1:
+                    cluster1 = st.selectbox(
+                        "Select cluster",
+                        sorted(st.session_state.adata.obs[cluster_key].unique()),
+                        key="cluster1_select"
+                    )
                 
-                with tab1:
-                    if compare_option == "vs all other cells":
-                        results = sc.get.rank_genes_groups_df(adata, group=cluster1)
+                with col2:
+                    compare_option = st.radio(
+                        "Comparison type",
+                        ["vs all other cells", "vs specific cluster"],
+                        key="compare_option"
+                    )
+                    
+                    if compare_option == "vs specific cluster":
+                        cluster2 = st.selectbox(
+                            "Select comparison cluster",
+                            sorted(st.session_state.adata.obs[cluster_key].unique()),
+                            key="cluster2_select"
+                        )
                     else:
-                        results = sc.get.rank_genes_groups_df(adata, group=cluster1, reference=cluster2)
-                    
-                    results = results[results['pvals_adj'] < 0.05]
-                    results = results.sort_values('scores', ascending=False)
-                    
-                    st.dataframe(results.head(20))
-                    
-                    # CSV Download Button (now outside form)
-                    csv = results.to_csv(index=False)
-                    st.download_button(
-                        label="Download Results as CSV",
-                        data=csv,
-                        file_name="diff_exp_results.csv",
-                        mime="text/csv"
-                    )
+                        cluster2 = None
                 
-                with tab2:
-                    st.subheader("Volcano Plot")
+                submitted = st.form_submit_button("Run Differential Expression")
+
+            # Results display and downloads (outside the form)
+            if submitted:
+                with st.spinner("Running differential expression analysis..."):
+                    adata = run_diff_exp_cached(st.session_state.adata, cluster1, cluster2)
+                    st.session_state.adata = adata
+                    st.success("Analysis completed!")
                     
-                    volcano_fig = px.scatter(results, x='logfoldchanges', y='-log10(pvals_adj)',
-                                           hover_name='names', color='scores',
-                                           color_continuous_scale='Viridis',
-                                           title="Volcano Plot of Differential Expression")
-                    st.plotly_chart(volcano_fig, use_container_width=True)
-                
-                with tab3:
-                    st.subheader("Heatmap of Top Genes")
+                    tab1, tab2, tab3 = st.tabs(["Results Table", "Volcano Plot", "Heatmap"])
                     
-                    top_genes = results.head(10)['names'].tolist()
-                    temp_adata = adata[:, top_genes].copy()
+                    with tab1:
+                        if compare_option == "vs all other cells":
+                            results = sc.get.rank_genes_groups_df(adata, group=cluster1)
+                        else:
+                            results = sc.get.rank_genes_groups_df(adata, group=cluster1, reference=cluster2)
+                        
+                        results = results[results['pvals_adj'] < 0.05]
+                        results = results.sort_values('scores', ascending=False)
+                        
+                        st.dataframe(results.head(20))
+                        
+                        # CSV Download Button (now outside form)
+                        csv = results.to_csv(index=False)
+                        st.download_button(
+                            label="Download Results as CSV",
+                            data=csv,
+                            file_name="diff_exp_results.csv",
+                            mime="text/csv"
+                        )
                     
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sc.pl.heatmap(temp_adata, var_names=top_genes, 
-                                 groupby=cluster_key, ax=ax, show=False)
-                    st.pyplot(fig)
+                    with tab2:
+                        st.subheader("Volcano Plot")
+                        
+                        volcano_fig = px.scatter(results, x='logfoldchanges', y='-log10(pvals_adj)',
+                                               hover_name='names', color='scores',
+                                               color_continuous_scale='Viridis',
+                                               title="Volcano Plot of Differential Expression")
+                        st.plotly_chart(volcano_fig, use_container_width=True)
                     
-                    # PNG Download Button (now outside form)
-                    heatmap_bytes = fig.to_image(format="png")
-                    st.download_button(
-                        label="Download Heatmap as PNG",
-                        data=heatmap_bytes,
-                        file_name="diff_exp_heatmap.png",
-                        mime="image/png"
-                    )
+                    with tab3:
+                        st.subheader("Heatmap of Top Genes")
+                        
+                        top_genes = results.head(10)['names'].tolist()
+                        temp_adata = adata[:, top_genes].copy()
+                        
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        sc.pl.heatmap(temp_adata, var_names=top_genes, 
+                                     groupby=cluster_key, ax=ax, show=False)
+                        st.pyplot(fig)
+                        
+                        # PNG Download Button (now outside form)
+                        heatmap_bytes = fig.to_image(format="png")
+                        st.download_button(
+                            label="Download Heatmap as PNG",
+                            data=heatmap_bytes,
+                            file_name="diff_exp_heatmap.png",
+                            mime="image/png"
+                        )
 
     elif app_mode == "Help":
         st.header("Help & Documentation")
-    
-    st.markdown("""
-    ## Getting Started
-    
-    1. **Upload your data** or select an example dataset
-    2. **Preprocess** your data (normalization, filtering, scaling)
-    3. **Visualize** your data using dimensionality reduction techniques
-    4. **Analyze** clusters and perform differential expression
-    
-    ## File Formats Supported
-    
-    - **CSV/TSV**: Gene expression matrix (genes × cells or cells × genes)
-    - **h5ad**: AnnData format (preferred for metadata preservation)
-    
-    ## Example Datasets
-    
-    - **pbmc3k**: 2,700 PBMCs from a healthy donor
-    - **pancreas**: Human pancreatic islet scRNA-seq data
-    - **tabula_muris**: 100,000 cells from 20 mouse organs and tissues
-    
-    ## Troubleshooting
-    
-    - If you encounter errors during preprocessing, try adjusting the filtering parameters
-    - For visualization issues, try reducing the number of principal components
-    - Clustering results can be adjusted using the resolution parameter
-    
-    ## Contact
-    
-    For technical support or feature requests, please contact [hanzo7n@gmail.com](mailto:hanzo7n@gmail.com)
-    """)
+        
+        st.markdown("""
+        ## Getting Started
+        
+        1. **Upload your data** or select an example dataset
+        2. **Preprocess** your data (normalization, filtering, scaling)
+        3. **Visualize** your data using dimensionality reduction techniques
+        4. **Analyze** clusters and perform differential expression
+        
+        ## File Formats Supported
+        
+        - **CSV/TSV**: Gene expression matrix (genes × cells or cells × genes)
+        - **h5ad**: AnnData format (preferred for metadata preservation)
+        
+        ## Example Datasets
+        
+        - **pbmc3k**: 2,700 PBMCs from a healthy donor
+        - **pancreas**: Human pancreatic islet scRNA-seq data
+        - **tabula_muris**: 100,000 cells from 20 mouse organs and tissues
+        
+        ## Troubleshooting
+        
+        - If you encounter errors during preprocessing, try adjusting the filtering parameters
+        - For visualization issues, try reducing the number of principal components
+        - Clustering results can be adjusted using the resolution parameter
+        
+        ## Contact
+        
+        For technical support or feature requests, please contact [hanzo7n@gmail.com](mailto:hanzo7n@gmail.com)
+        """)
 
 if __name__ == "__main__":
     main()
