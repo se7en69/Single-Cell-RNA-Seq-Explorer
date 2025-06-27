@@ -10,6 +10,7 @@ import time
 import hashlib
 from io import StringIO
 import altair as alt
+from io import BytesIO
 
 # Set page config
 st.set_page_config(
@@ -249,58 +250,66 @@ def run_diff_exp(adata, cluster1, cluster2=None):
 
 # Visualization functions
 def create_interactive_plot(adata, plot_type, color_by=None, gene=None):
-    if plot_type == "UMAP":
-        coords = adata.obsm['X_umap']
-        title = "UMAP Projection"
-    elif plot_type == "t-SNE":
-        coords = adata.obsm['X_tsne']
-        title = "t-SNE Projection"
-    else:
-        coords = adata.obsm['X_pca'][:, :2]
-        title = "PCA Projection (First 2 PCs)"
-    
-    plot_df = pd.DataFrame({
-        'x': coords[:, 0],
-        'y': coords[:, 1]
-    })
-    
-    if color_by is not None:
-        if color_by == "Expression":
-            plot_df['color'] = adata[:, gene].X.toarray().flatten()
-            color_label = f"Expression: {gene}"
-            color_scale = 'Viridis'
-        else:
-            plot_df['color'] = adata.obs[color_by].values
-            color_label = color_by
-            if pd.api.types.is_numeric_dtype(plot_df['color']):
+    try:
+        # Get the correct coordinates based on plot type
+        if plot_type == "UMAP":
+            coords = adata.obsm['X_umap']
+            title = "UMAP Projection"
+        elif plot_type == "t-SNE":
+            coords = adata.obsm['X_tsne']  # Note: 'tsne' without hyphen
+            title = "t-SNE Projection"
+        else:  # PCA
+            coords = adata.obsm['X_pca'][:, :2]
+            title = "PCA Projection (First 2 PCs)"
+        
+        plot_df = pd.DataFrame({
+            'x': coords[:, 0],
+            'y': coords[:, 1]
+        })
+        
+        if color_by is not None and color_by != "None":
+            if color_by == "Expression":
+                plot_df['color'] = adata[:, gene].X.toarray().flatten()
+                color_label = f"Expression: {gene}"
                 color_scale = 'Viridis'
             else:
-                color_scale = None
+                plot_df['color'] = adata.obs[color_by].values
+                color_label = color_by
+                if pd.api.types.is_numeric_dtype(plot_df['color']):
+                    color_scale = 'Viridis'
+                else:
+                    color_scale = None
+            
+            fig = px.scatter(plot_df, x='x', y='y', color='color',
+                           color_continuous_scale=color_scale,
+                           title=f"{title} - Colored by {color_label}",
+                           labels={'color': color_label},
+                           hover_data={'x': False, 'y': False, 'color': True})
+        else:
+            fig = px.scatter(plot_df, x='x', y='y', title=title)
         
-        fig = px.scatter(plot_df, x='x', y='y', color='color',
-                       color_continuous_scale=color_scale,
-                       title=f"{title} - Colored by {color_label}",
-                       labels={'color': color_label},
-                       hover_data={'x': False, 'y': False, 'color': True})
-    else:
-        fig = px.scatter(plot_df, x='x', y='y', title=title)
+        fig.update_layout(
+            hovermode='closest',
+            plot_bgcolor='rgba(240,240,240,0.9)',
+            paper_bgcolor='rgba(240,240,240,0.5)',
+            margin=dict(l=20, r=20, t=40, b=20),
+            xaxis_title=f"{plot_type} 1",
+            yaxis_title=f"{plot_type} 2"
+        )
+        
+        fig.update_traces(
+            marker=dict(size=4, line=dict(width=0.5, color='DarkSlateGrey')),
+            selector=dict(mode='markers')
+        )
+        
+        return fig
     
-    fig.update_layout(
-        hovermode='closest',
-        plot_bgcolor='rgba(240,240,240,0.9)',
-        paper_bgcolor='rgba(240,240,240,0.5)',
-        margin=dict(l=20, r=20, t=40, b=20),
-        xaxis_title=f"{plot_type} 1",
-        yaxis_title=f"{plot_type} 2"
-    )
-    
-    fig.update_traces(
-        marker=dict(size=4, line=dict(width=0.5, color='DarkSlateGrey')),
-        selector=dict(mode='markers')
-    )
-    
-    return fig
-
+    except KeyError as e:
+        st.error(f"Could not find coordinates for {plot_type}. Please run dimensionality reduction first.")
+        return None
+    except Exception as e:
+        st.error(f"Error creating plot: {str(e)}")
+        return None
 # Main app function
 def main():
     # Sidebar navigation
@@ -452,44 +461,71 @@ def main():
                 st.session_state.adata = adata
                 st.success("Dimensionality reduction completed!")
         
-        if 'X_umap' in st.session_state.adata.obsm:
-            viz_col1, viz_col2 = st.columns([1, 3])
+        # Check which dimensionality reduction results are available
+        has_umap = 'X_umap' in st.session_state.adata.obsm
+        has_tsne = 'X_tsne' in st.session_state.adata.obsm
+        has_pca = 'X_pca' in st.session_state.adata.obsm
+        
+        if not (has_umap or has_tsne or has_pca):
+            st.warning("No dimensionality reduction results found. Please run dimensionality reduction first.")
+            return
+        
+        viz_col1, viz_col2 = st.columns([1, 3])
+        
+        with viz_col1:
+            st.subheader("Plot Settings")
             
-            with viz_col1:
-                st.subheader("Plot Settings")
-                plot_type = st.selectbox(
-                    "Plot type",
-                    ["UMAP", "t-SNE", "PCA"],
-                    key="plot_type_select"
+            # Only show available plot types
+            available_plots = []
+            if has_umap: available_plots.append("UMAP")
+            if has_tsne: available_plots.append("t-SNE")
+            if has_pca: available_plots.append("PCA")
+            
+            plot_type = st.selectbox(
+                "Plot type",
+                available_plots,
+                key="plot_type_select"
+            )
+            
+            color_by = st.selectbox(
+                "Color by",
+                ["None"] + list(st.session_state.adata.obs.columns) + ["Expression"],
+                key="color_by_select"
+            )
+            
+            if color_by == "Expression":
+                gene = st.selectbox(
+                    "Select gene",
+                    st.session_state.adata.var_names.tolist(),
+                    key="gene_select"
                 )
-                
-                color_by = st.selectbox(
-                    "Color by",
-                    ["None"] + list(st.session_state.adata.obs.columns) + ["Expression"],
-                    key="color_by_select"
-                )
-                
-                if color_by == "Expression":
-                    gene = st.selectbox(
-                        "Select gene",
-                        st.session_state.adata.var_names.tolist(),
-                        key="gene_select"
-                    )
-                else:
-                    gene = None
-                
-                st.markdown("**Download Options**")
+            else:
+                gene = None
+            
+            st.markdown("**Download Options**")
+            
+            # Mapping between display names and obsm keys
+            plot_key_map = {
+                "UMAP": "umap",
+                "t-SNE": "tsne",  # Note: 'tsne' without hyphen
+                "PCA": "pca"
+            }
+            
+            plot_key = f'X_{plot_key_map[plot_type]}'
+            
+            if plot_key in st.session_state.adata.obsm:
                 st.download_button(
                     label="📥 Download Coordinates",
-                    data=pd.DataFrame(st.session_state.adata.obsm[f'X_{plot_type.lower()}']).to_csv(),
+                    data=pd.DataFrame(st.session_state.adata.obsm[plot_key]).to_csv(),
                     file_name=f"{plot_type}_coordinates.csv",
                     mime="text/csv"
                 )
-            
-            with viz_col2:
-                fig = create_interactive_plot(st.session_state.adata, plot_type, color_by, gene)
+        
+        with viz_col2:
+            fig = create_interactive_plot(st.session_state.adata, plot_type, color_by, gene)
+            if fig is not None:
                 st.plotly_chart(fig, use_container_width=True)
-    
+
     elif app_mode == "Analysis":
         st.header("Data Analysis")
         
@@ -599,36 +635,58 @@ def main():
                             file_name="diff_exp_results.csv",
                             mime="text/csv"
                         )
-                    
                     with tab2:
                         st.subheader("Volcano Plot")
                         
-                        volcano_fig = px.scatter(results, x='logfoldchanges', y='-log10(pvals_adj)',
-                                               hover_name='names', color='scores',
-                                               color_continuous_scale='Viridis',
-                                               title="Volcano Plot of Differential Expression")
-                        st.plotly_chart(volcano_fig, use_container_width=True)
-                    
+                        # Add transformed column
+                        results['neg_log10_pvals_adj'] = -np.log10(results['pvals_adj'])
+                        
+                        volcano_fig = px.scatter(
+                            results,
+                            x='logfoldchanges',
+                            y='neg_log10_pvals_adj',
+                            hover_name='names',
+                            color='scores',
+                            color_continuous_scale='Viridis',
+                            title="Volcano Plot of Differential Expression",
+                            labels={
+                                'logfoldchanges': 'log2(Fold Change)',
+                                'neg_log10_pvals_adj': '-log10(Adjusted p-value)'
+                            }
+                        )
+                        st.plotly_chart(volcano_fig, use_container_width=True)                    
                     with tab3:
                         st.subheader("Heatmap of Top Genes")
                         
                         top_genes = results.head(10)['names'].tolist()
                         temp_adata = adata[:, top_genes].copy()
                         
+                        # Convert to DataFrame
+                        df = pd.DataFrame(
+                            temp_adata.X.T,
+                            index=temp_adata.var_names,
+                            columns=temp_adata.obs[cluster_key]
+                        )
+                        
+                        # Plot with Seaborn
                         fig, ax = plt.subplots(figsize=(10, 6))
-                        sc.pl.heatmap(temp_adata, var_names=top_genes, 
-                                     groupby=cluster_key, ax=ax, show=False)
+                        sns.heatmap(df, ax=ax, cmap='viridis')
+                        
+                        # Display and download
                         st.pyplot(fig)
                         
-                        # PNG Download Button (now outside form)
-                        heatmap_bytes = fig.to_image(format="png")
+                        buf = BytesIO()
+                        fig.savefig(buf, format="png", bbox_inches='tight', dpi=300)
+                        buf.seek(0)
+                        
                         st.download_button(
                             label="Download Heatmap as PNG",
-                            data=heatmap_bytes,
+                            data=buf,
                             file_name="diff_exp_heatmap.png",
                             mime="image/png"
                         )
-
+                        
+                        plt.close(fig)
     elif app_mode == "Help":
         st.header("Help & Documentation")
         
