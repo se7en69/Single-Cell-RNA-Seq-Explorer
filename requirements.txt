@@ -8,3 +8,4 @@ scipy
 python-igraph
 h5py
 anndata
+leidenalg
